@@ -123,6 +123,13 @@ DTCM：存放数据；ITCM:存放程序
 3.STM32寻址大小：2^32=4G（字节）；STM32寻址范围：0x0000 0000 ~ 0xFFFF FFFF
 ### 存储器映射
 存储器指可以存储数据的设备，本身没有地址信息，对存储器分配地址的过程称为存储器映射。
+
+存储器功能划分（F1为例）
+ <img width="1046" height="499" alt="image" src="https://github.com/user-attachments/assets/10522210-b037-4dbc-98f6-fd8ba383aced" />
+<img width="1125" height="450" alt="image" src="https://github.com/user-attachments/assets/a55ec18a-ec51-40cd-abb6-4275d8e7b0fd" />
+<img width="974" height="225" alt="image" src="https://github.com/user-attachments/assets/bb3831b2-084a-42fa-a50e-69ee0cd9a9a5" />
+<img width="971" height="410" alt="image" src="https://github.com/user-attachments/assets/65e94bdf-181a-4431-bf53-bef08387c99f" />
+
 ### 寄存器映射
 寄存器是单片机内部一种特殊的内存，可以实现对单片机各个功能的控制，即寄存器就是单片机内部的控制机构
 
@@ -136,11 +143,107 @@ STM32寄存器分类
 
 寄存器是特殊的存储器，给寄存器地址命名的过程，就叫寄存器映射
 
+寄存器地址计算：将寄存器地址分为三个部分，其地址等于三者相加
+- 总线基地址（BUS_BASE_ADDR）
+- 外设基于总线基地址的偏移量（PERIPH_OFFSET)【APB1总线的基地址，也叫外设基地址】
+- 寄存器相对外设基地址的偏移量（REG_OFFSET)
+ 寄存器映射方法：
 
+1.单个映射
 
+  <img width="627" height="274" alt="image" src="https://github.com/user-attachments/assets/ee414687-d10a-46b0-9b7e-3c3530e43066" />
 
+2.使用结构体，可以一次映射多个
 
+  <img width="433" height="424" alt="image" src="https://github.com/user-attachments/assets/c6e0ad76-2a8a-44f4-8096-d9a1c48a07f4" />
+  
+<img width="717" height="383" alt="image" src="https://github.com/user-attachments/assets/f5fbdb9b-bde3-4e7d-846c-d538b81f6135" />
 
+### SYSTEM文件夹介绍
+- sys文件夹
+<img width="1190" height="460" alt="image" src="https://github.com/user-attachments/assets/5c774dc5-9f86-4fc1-ade7-3f87292fd11a" />
+
+- deley文件夹介绍
+  <img width="956" height="222" alt="image" src="https://github.com/user-attachments/assets/a8c6b3da-2d90-42c5-bbf9-7c4e9ce62920" />
+
+  - SysTick工作原理：SysTick，即系统滴答定时器，包含在M3/4/7内核里面，核心是一个24位的递减计数器
+  <img width="1112" height="402" alt="image" src="https://github.com/user-attachments/assets/594c12e8-84d9-41dc-ba4b-25c70e34e3ec" />
+  
+  - SysTick内存器介绍
+  <img width="1093" height="376" alt="image" src="https://github.com/user-attachments/assets/b14cf770-66cd-4d6c-95bb-4cacf8acdfb2" />
+
+### STM32启动过程
+1.启动模式（F1/F4/F7/H7）也称自举模式：
+
+M3/M4/M7等内核复位后，做的第一件事：从地址0x0000 0000处去除***堆栈指针MSP***的初始值，该值就是栈顶地址；从地址0x0000 0004处取出***程序计数器指针PC***的初始值，该值是复位向量。
+
+F1:在系统复位后，SYSCLK的第四个上升沿，BOOT引脚的值将被封锁
+
+F7：在系统复位后，SYSCLK的第四个上升沿，BOOT引脚的值将被封锁
+
+2.STM32启动过程（内部FLASH启动为例）
+
+***启动流程的五个关键步骤***：
+- 上电复位--->硬件初始化
+- 执行启动文件（startup_xxx.s）
+- SystemInit()---系统时钟初始化
+- C/C++运行时初始化
+- 进入main函数---用户程序开始
+  
+即：Reset--->获取MSP值0x0800 0000，获取PC值0x0800 0004--->Reset_Handler--->启动文件startup_stm32xxx.s--->main函数
+
+启动文件介绍：
+- 初始化MSP
+- 初始化PC
+- 设置堆栈大小
+- 初始化中断向量表
+- 调用初始化函数
+- 调用main函数
+
+Reset_Handler函数介绍
+<img width="712" height="248" alt="image" src="https://github.com/user-attachments/assets/a1e5056b-e0cc-449c-9ff5-c22defc69bd6" />
+
+|内存|作用|
+|---|---|
+|栈（Stack)|编译器自动分配和释放，存放函数参数、局部变量等|
+|堆（Heap)|程序员分配和释放，如malloc\calloc\realloc等|
+
+函数局部变量较多，嵌套关系复杂时，需加大栈大小（Stack_Size）
+
+***中断向量表***：是一个存储在固定地址的数组，每个元素是一个函数指针（即“向量”），指向对应中断/异常的处理函数
+
+### STM32时钟系统
+时钟是具有周期性的脉冲信号，最常用的是占比50%的方波
+
+#### 时钟树（F1）
+
+|时钟源名称|频率|材料|用途|
+|---|---|---|---|
+|高速外部振荡器（HSE）|4~16MHz|晶体/陶瓷|SYSCLK/RTC|
+|低速外部振荡器（LSE)|32.768KHz|晶体/陶瓷|RTC|
+|高速内部振荡器（HSI）|8MHz|RC|SYSCLK|
+|低速内部振荡器（LSI）|40KHz|RC|RTC/IWDG|
+
+|符号|作用|
+|---|---|
+|时钟安全系统（CSS）|如果HSE启动失败，切换到HSI。可进NMI中断|
+|自由运行时钟（FCLK）|用于采样中断和调试模块计时，休眠仍有效|
+
+<img width="1294" height="413" alt="image" src="https://github.com/user-attachments/assets/ca9598a8-d9c1-4425-b73b-4297f1b1e33e" />
+
+时钟源、锁相环：HAL_RCC_OscConfig()
+
+系统时钟、总线：HAL_RCC_ClockConfig()
+
+使能外设时钟：__HAL_RCC_PPP_CLK_ENABLE()
+
+扩展外设时钟(RTC/ADC/USB):HAL_RCCEx_PeriphCLKConfig
+
+#### 时钟树F4
+<img width="1274" height="582" alt="image" src="https://github.com/user-attachments/assets/18604248-06a0-43b1-85cc-17e8e80e9bd0" />
+<img width="632" height="203" alt="image" src="https://github.com/user-attachments/assets/db5387a0-5ce2-4f65-9519-d89b74ab0877" />
+
+#### 配置系统时钟
 
 
 
